@@ -22,7 +22,7 @@ class ScriptContentProcessor:
     def process(self, content: str) -> str:
         for transformer in self.transformers:
             content = transformer(content)
-        return ruamel.yaml.scalarstring.PreservedScalarString(content)
+        return content
 
 
 class ScriptPathCollector:
@@ -183,7 +183,12 @@ def main() -> None:
     args = parse_args()
     script_path_collector = ScriptPathCollector()
     script_paths = script_path_collector.collect(args.basedir, ".sh", ".ps1")
-    content_processor = ScriptContentProcessor(remove_shebang, remove_set_commands)
+    content_processor = ScriptContentProcessor(
+        remove_shebang,
+        remove_set_commands,
+        ruamel.yaml.scalarstring.PreservedScalarString,
+    )
+
     script_data_extractor = ScriptDataExtractor(content_processor, detect_script_type)
     script_processor = ScriptProcessor(
         "scripts.yaml", script_data_extractor, content_processor
