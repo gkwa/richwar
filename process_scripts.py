@@ -149,6 +149,11 @@ class ScriptProcessor:
         return self.processed_script_count
 
 
+def check_sensitive_info(script_path: pathlib.Path) -> bool:
+    content = script_path.read_text()
+    return bool(re.search(r"\bset\s+\+x\b", content))
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -156,6 +161,12 @@ def parse_args() -> argparse.Namespace:
         type=pathlib.Path,
         required=True,
         help="Base directory containing script files",
+    )
+    parser.add_argument(
+        "--check-sensitive",
+        action="store_true",
+        default=True,
+        help="Check if the script contains 'set +x' to hide sensitive information",
     )
     return parser.parse_args()
 
@@ -167,22 +178,38 @@ def group_by_install_method(script_path: pathlib.Path) -> str:
         return "any"
     if re.search(r"\bapt\b", content):
         return "apt"
-    elif re.search(r"\bpip3?\b", content):
+    if re.search(r"\bpip3?\b", content):
         return "pip"
-    elif re.search(r"\byum\b", content):
+    if re.search(r"\byum\b", content):
         return "yum"
-    elif re.search(r"\bbrew\b", content):
+    if re.search(r"\bbrew\b", content):
         return "homebrew"
-    elif re.search(r"\bcurl\b", content):
+    if re.search(r"\bcurl\b", content):
         return "curl"
     else:
         return "other"
+
+
+def process_sensitive_info(script_paths: typing.List[pathlib.Path]) -> None:
+    sensitive_scripts = [
+        script_path for script_path in script_paths if check_sensitive_info(script_path)
+    ]
+    if sensitive_scripts:
+        print("Scripts containing 'set +x' (potentially hiding sensitive information):")
+        for script_path in sensitive_scripts:
+            print(script_path)
+    else:
+        print("No scripts found containing 'set +x'")
 
 
 def main() -> None:
     args = parse_args()
     script_path_collector = ScriptPathCollector()
     script_paths = script_path_collector.collect(args.basedir, ".sh", ".ps1")
+
+    if args.check_sensitive:
+        process_sensitive_info(script_paths)
+
     content_processor = ScriptContentProcessor(
         remove_shebang,
         remove_set_commands,
